@@ -366,10 +366,11 @@ context Discount inv domainPercentage:
 -- At least as many bathrooms than beds for prestige residence.
 -- Easy. Use implies.
 
--- context Bedroom inv enoughBathroomsInPrestige:
+context Bedroom inv enoughBathroomsInPrestige:
     -- In a prestige residence, the number of private bathrooms is at
     -- least the same as the number of beds in each bedroom.
-
+	self.residence.category = Category::prestige 
+		implies self.nbOfSingleBeds+self.nbOfDoubleBeds >= self.bathrooms->size()
 
 -------------------------------------------------------------------------------
 --                            floorBetweenMinAndMax
@@ -377,10 +378,11 @@ context Discount inv domainPercentage:
 -- Floor between minimum and maximum floors.
 -- Easy
 
--- context Room inv floorBetweenMinAndMax:
+context Room inv floorBetweenMinAndMax:
     -- The floor of a room is between the minium and maximum floor of
     -- the residence.
-
+	self.floor >= self.residence.floorMin and self.floor <= self.residence.floorMax
+	
 
 -------------------------------------------------------------------------------
 --                                  floorOrder
@@ -388,10 +390,11 @@ context Discount inv domainPercentage:
 -- Order between floorMin and floorMax attributes.
 -- Easy
 
--- context Residence inv floorOrder:
+context Residence inv floorOrder:
     -- The maximum floor is at higher or at the same level that the
     -- minimum floor of the residence.
-
+	self.floorMax >= self.floorMin
+	
 
 -------------------------------------------------------------------------------
 --                                 labelUnique
@@ -458,8 +461,9 @@ context Resident inv marriageSymmetry:
 -- Rented bedrooms not empty.
 -- Easy. Use 'implies'
 
--- context Bedroom inv noEmptyRentedBedrooms:
+context Bedroom inv noEmptyRentedBedrooms:
     -- All rented bedrooms are occupied by at least one occupant.
+	self.tenant->size() = 1 implies self.occupants->notEmpty()
 
 
 -------------------------------------------------------------------------------
@@ -468,10 +472,10 @@ context Resident inv marriageSymmetry:
 -- Nobody in rooms not rented.
 -- Easy. Use 'implies'
 
--- context Bedroom inv noSquaters:
+context Bedroom inv noSquaters:
     -- Occupants must be exclusively in rooms that are rented by
     -- somebody.
-
+	self.tenant->size() = 0 implies self.occupants->size() = 0
 
 -------------------------------------------------------------------------------
 --                               noTutorForAdults
@@ -490,8 +494,9 @@ context Resident inv noTutorForAdults:
 -- No rental of Out Of Order bedrooms.
 -- Easy
 
--- context Bedroom inv oooBedroomsNotRented:
+context Bedroom inv oooBedroomsNotRented:
     -- Bedrooms that are out of order cannot be rented.
+	self.isOutOfOrder implies self.tenant->isEmpty()
 
 
 -------------------------------------------------------------------------------
@@ -500,11 +505,12 @@ context Resident inv noTutorForAdults:
 -- Out of order bathroom implications if prestige. 
 -- Medium. Use 'implies'
 
--- context Bathroom inv oooIfPrestige:
+context Bathroom inv oooIfPrestige:
     -- In prestige residences, it is not acceptable to rent bedrooms
     -- with bathrooms that are out of order. So if a bathrom is marked
     -- as out of order, the corresponding bedroom is also marked as
     -- out of order.
+	(self.residence.category = Category::prestige and self.isOutOfOrder) implies self.bedrooms.isOutOfOrder
 
 
 -------------------------------------------------------------------------------
@@ -524,10 +530,11 @@ context Tenant inv rentInOneResidence:
 -- Same number if private.
 -- Easy. Use 'implies'.
 
--- context Bathroom inv sameNumberIfPrivate:
+context Bathroom inv sameNumberIfPrivate:
     -- All bathrooms that are not on the landing, that is that are
     -- private to a bedroom, have the same number of room as this
     -- bedroom.
+	self.isOnTheLanding = false implies self.bedrooms->size() = 1 and self.number = self.bedrooms.number
 
 
 -------------------------------------------------------------------------------
@@ -561,9 +568,10 @@ context Tenant inv rentInOneResidence:
 -- Smoking policy for premium residences.
 -- Not easy
 
--- context Bedroom inv smokingPremiumPolicy:
+context Bedroom inv smokingPremiumPolicy:
     -- In a premium residence a resident that specified that he or she
     -- is non smoker will never ever be place in a smoking room.
+	self.occupants->forAll(r : Resident | r.isSmoker = false) implies self.isNonSmoking
 
 
 -------------------------------------------------------------------------------
@@ -572,9 +580,9 @@ context Tenant inv rentInOneResidence:
 -- No smoking is prestige.
 -- Easy
 
--- context Bedroom inv smokingPrestigePolicy:
+context Bedroom inv smokingPrestigePolicy:
     -- There are no smoking rooms at all in residence of prestige.
-
+	self.residence.category = Category::prestige implies self.isNonSmoking
 
 -------------------------------------------------------------------------------
 --                              tenantInRentedRoom
@@ -616,6 +624,7 @@ context Resident inv tutorInSameGroup:
 -- Invariant on room numbering.
 -- Medium
 
--- context Residence inv uniqueNumberApartForPrivateBathroom:
+context Residence inv uniqueNumberApartForPrivateBathroom:
     -- All rooms have a distinct number, except private bathrooms.
-
+	self.rooms->isUnique(number)
+	
