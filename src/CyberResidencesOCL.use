@@ -192,9 +192,9 @@ context Residence inv allPrestigeBathrooms:
 -- At least one bed for useful bedrooms.
 -- Easy. Use implies.
 
--- context Bedroom inv atLeastABed:
+context Bedroom inv atLeastABed:
     -- Bedrooms that are not out of order must have at least one bed.
-
+	self.isOutOfOrder implies (nbOfSingleBeds > 0 or nbOfDoubleBeds > 0)
 
 -------------------------------------------------------------------------------
 --                               atLeastOneAdult
@@ -202,8 +202,9 @@ context Residence inv allPrestigeBathrooms:
 -- At least one adult per room.
 -- Easy. Use 'implies'
 
--- context Bedroom inv atLeastOneAdult:
+context Bedroom inv atLeastOneAdult:
     -- At least one adult must be presented in all occupied rooms.
+	self.occupants->select(age>17)->notEmpty()
 
 
 -------------------------------------------------------------------------------
@@ -213,8 +214,9 @@ context Residence inv allPrestigeBathrooms:
 -- Easy
 
 
--- context Resident inv childNonSmoking:
+context Resident inv childNonSmoking:
     -- Children are always declared as non smoker.
+	self.age < 18 implies self.isSmoker = false
 
 
 -------------------------------------------------------------------------------
@@ -227,7 +229,7 @@ context Residence inv allPrestigeBathrooms:
     -- Resident that are less than 18 years old must have at least one
     -- tutor, apart in prestige residences where this rule does not
     -- apply.
-
+	
 
 -------------------------------------------------------------------------------
 --                              cumulatedDiscounts
@@ -245,11 +247,10 @@ context Residence inv allPrestigeBathrooms:
 -- Derivation of the avgRate attribute.
 -- Medium
 
--- context Residence inv deriveAvgRate:
+--context Residence inv deriveAvgRate:
     -- The average rate of a residence is the total revenue of the
     -- residence divided by the number of occupants. Tutored residents
-    -- do not count in this rule.
-
+    -- do not count in this rule
 
 -------------------------------------------------------------------------------
 --                                deriveDiscount
@@ -268,10 +269,12 @@ context Residence inv allPrestigeBathrooms:
 -- Derivation of the attribute floor.
 -- Easy
 
--- context Room inv deriveFloor:
+context Room inv deriveFloor:
     -- The floor number correspond to the first digits of the room
     -- number, where the last two digits are removed. For instance the
     -- room 634 is at the floor 6.
+	self.floor = number/100 -- il sort un reel au lieu d'un entier
+	
 
 
 -------------------------------------------------------------------------------
@@ -280,10 +283,11 @@ context Residence inv allPrestigeBathrooms:
 -- Derivation of isOnTheLanding attribute.
 -- Easy
 
--- context Bathroom inv deriveIsOnTheLanding:
+context Bathroom inv deriveIsOnTheLanding:
     -- A bathroom is said to be on the landing if it is not in a
     -- bedroom.
-
+	self.isOnTheLanding = true
+	
 
 -------------------------------------------------------------------------------
 --                            deriveMaxNbOfFreeUnits
@@ -291,10 +295,11 @@ context Residence inv allPrestigeBathrooms:
 -- Derivation of maxNbOfFreeUnits attribute.
 -- Easy
 
--- context Residence inv deriveMaxNbOfFreeUnits:
+context Residence inv deriveMaxNbOfFreeUnits:
     -- The maximum number of free units is equal to the maximum number
     -- of places in beds of all rooms of the residence.
-
+	self.maxNbOfFreeUnits = self.bedrooms()->collect(nbOfDoubleBeds+nbOfSingleBeds)->sum()
+	
 
 -------------------------------------------------------------------------------
 --                               deriveNbOfUnits
@@ -306,6 +311,7 @@ context Residence inv allPrestigeBathrooms:
     -- The number of units of a bedroom is the maximum number of
     -- people that can fit within the bedroom assuming that all places
     -- in all beds are full.
+	-- ????? pas compris
 
 
 -------------------------------------------------------------------------------
