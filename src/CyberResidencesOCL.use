@@ -122,7 +122,7 @@ composition ContainsRooms between
   Room[*] role rooms
 end
 
-association occupiedRoom between
+composition occupiedRoom between
   Bedroom[1] role IsOccupiedBy
   Resident[*] role occupants
 end
@@ -136,11 +136,15 @@ constraints
 -- Conditions for granting a discount "All Bathrooms Out Of Order" (ABOOO).
 -- Note Easy. Use 'one'. Should world with 'xxxPercentage'
 
--- context Rent inv aboooConditions:
+context Rent inv aboooConditions:
     -- A discount is given for bedrooms that have all bathrooms out of
     -- order. The label of this type of discount is 'BROOO50'. This
     -- rule does not apply in economy residences.
-
+	let r: Residence = self.rentedBedroom.residence in
+		r.category<>Category::economy implies
+			r.bathrooms()->select(b: Bathroom | b.isOutOfOrder = true)->size() = r.bathrooms()->size() implies
+				self.discount >= 0 and self.discounts->forAll(d: Discount | d.label='BROOO50')
+				
 
 -------------------------------------------------------------------------------
 --                               aboooPercentage
@@ -158,8 +162,9 @@ constraints
 -- Only adult married.
 -- Easy. Use 'implies'
 
---context Resident inv adultMarried:
+context Resident inv adultMarried:
     -- To be registered as married, resident must be adult.
+	self.consort->notEmpty() implies self.age >= 18
 
 
 -------------------------------------------------------------------------------
@@ -225,11 +230,11 @@ context Resident inv childNonSmoking:
 -- Child tutored.
 -- Medium
 
--- context Resident inv childTutored:
+context Resident inv childTutored:
     -- Resident that are less than 18 years old must have at least one
     -- tutor, apart in prestige residences where this rule does not
     -- apply.
-	
+	self.age < 18 and self.IsOccupiedBy.residence.category <> Category::prestige implies self.tutors->size() > 0
 
 -------------------------------------------------------------------------------
 --                              cumulatedDiscounts
@@ -237,8 +242,9 @@ context Resident inv childNonSmoking:
 -- Limit of cumulated discounts.
 -- Easy. Use 'sum'
 
--- context Rent inv cumulatedDiscounts:
+context Rent inv cumulatedDiscounts:
     -- No room will have more that 70% of dicounts cumulated.
+    self.discount <= self.discounts->collect(percentage)->sum()
 
 
 -------------------------------------------------------------------------------
@@ -258,9 +264,10 @@ context Resident inv childNonSmoking:
 -- Derivation of the attribute discount.
 -- Easy
 
--- context Rent inv deriveDiscount:
+context Rent inv deriveDiscount:
     -- The discount for a rent, is the rate of the bedroom multiplied
     -- by the sum of percentages of all discounts.
+    self.discount = self.rate*self.discounts->collect(percentage)->sum()
 
 
 -------------------------------------------------------------------------------
@@ -321,23 +328,27 @@ context Residence inv deriveMaxNbOfFreeUnits:
 -- Not Easy. Use 'if ... then ... else ... endif'   and
 -- 'let groupFloors : Set(Integer) = ... in ...'
 
--- context Tenant inv derivePaidRate:
+context Tenant inv derivePaidRate:
     -- The total amount paid by a tenant is the sum of rent rates for
     -- all bedrooms rented. If the members of his or her group is
     -- spread over more than one floor, then 20€ of reduction will
     -- automatically be deduced.
-
-
+	let groupFloors : Set(Integer) = self.rentedBedroom->collect(floor)->asSet() in
+		if groupFloors->size() > 1 then
+			self.paidRate = self.rentedBedroom->collect(rate)->sum() - 20
+		else
+			self.paidRate = self.rentedBedroom->collect(rate)->sum()
+		endif
 -------------------------------------------------------------------------------
 --                                  deriveRate
 -------------------------------------------------------------------------------
 -- Derivation of the attribute rate.
 -- Easy
 
--- context Rent inv deriveRate:
+context Rent inv deriveRate:
     -- The rate of a rent corresponds to the regular rate for the room
     -- minus the discount.
-
+	self.rate = self.rentedBedroom.rate - self.discount
 
 -------------------------------------------------------------------------------
 --                               domainPercentage
@@ -345,9 +356,9 @@ context Residence inv deriveMaxNbOfFreeUnits:
 -- Domain of percentage attribute.
 -- Easy
 
--- context Discount inv domainPercentage:
+context Discount inv domainPercentage:
     -- The percentage is a value between 1 and 100.
-
+	1 <= self.percentage and self.percentage <= 100
 
 -------------------------------------------------------------------------------
 --                          enoughBathroomsInPrestige
@@ -388,8 +399,9 @@ context Residence inv deriveMaxNbOfFreeUnits:
 -- Uniqueness of labels with respect to rents.
 -- Easy. Use 'unique'
 
--- context Rent inv labelUnique:
+context Rent inv labelUnique:
     -- All discounts associated to a rent have distinct labels.
+	self.discounts->isUnique(label)
 
 
 -------------------------------------------------------------------------------
@@ -398,9 +410,9 @@ context Residence inv deriveMaxNbOfFreeUnits:
 -- Anti-reflexivity of marriage relationship.
 -- Easy
 
--- context Resident inv marriageAntiReflexivity:
+context Resident inv marriageAntiReflexivity:
     -- A resident cannot mary with himself or herself.
-
+	self.consort->notEmpty() implies self.consort <> self.consort.consort
 
 -------------------------------------------------------------------------------
 --                             marriageInSameGroup
@@ -408,10 +420,14 @@ context Residence inv deriveMaxNbOfFreeUnits:
 -- Consorts in the same group.
 -- Medium
 
--- context Resident inv marriageInSameGroup:
+context Resident inv marriageInSameGroup:
     -- A resident and his or her consort occupies a room of the same
     -- group.
-
+	-- ?? Define a group.
+	self.consort->notEmpty() implies
+		self.consort.IsOccupiedBy.floor = self.consort.consort.IsOccupiedBy.floor and
+		self.consort.IsOccupiedBy.number = self.consort.consort.IsOccupiedBy.number and
+		self.consort.IsOccupiedBy.residence = self.consort.consort.IsOccupiedBy.residence
 
 -------------------------------------------------------------------------------
 --                               marriageSymmetry
@@ -419,11 +435,11 @@ context Residence inv deriveMaxNbOfFreeUnits:
 -- Symmetry of marriage relationship.
 -- Easy
 
--- context Resident inv marriageSymmetry:
+context Resident inv marriageSymmetry:
     -- If a resident is declared to be the consort of another
     -- resident, then the opposite is true as well.
-
-
+	self.consort->notEmpty() implies self.consort.consort->notEmpty()
+	
 -------------------------------------------------------------------------------
 --                              noBedroomOverload
 -------------------------------------------------------------------------------
@@ -463,8 +479,9 @@ context Residence inv deriveMaxNbOfFreeUnits:
 -- No tutor for adults.
 -- Easy
 
--- context Resident inv noTutorForAdults:
+context Resident inv noTutorForAdults:
     -- Adults never have tutor.
+	self.age > 18 implies self.tutors->isEmpty()
 
 
 -------------------------------------------------------------------------------
@@ -496,10 +513,10 @@ context Residence inv deriveMaxNbOfFreeUnits:
 -- Medium. Should be rather short.
 -- <Enter note text here>
 
--- context Tenant inv rentInOneResidence:
+context Tenant inv rentInOneResidence:
     -- For a given tenant, all rented bedrooms are in the same
     -- residence.
-
+	self.rentedBedroom->forAll(b1,b2: Bedroom | b1.residence = b2.residence)
 
 -------------------------------------------------------------------------------
 --                             sameNumberIfPrivate
@@ -565,9 +582,9 @@ context Residence inv deriveMaxNbOfFreeUnits:
 -- Room occupied by the tenant.
 -- Medium. 
 
--- context Tenant inv tenantInRentedRoom:
+context Tenant inv tenantInRentedRoom:
     -- A tenant occupies one of the bedroom that he or she has rented.
-
+	self.rentedBedroom->exists(b: Bedroom | b = self.IsOccupiedBy)
 
 -------------------------------------------------------------------------------
 --                                  tutorAdult
@@ -575,10 +592,10 @@ context Residence inv deriveMaxNbOfFreeUnits:
 -- Tutors are adults.
 -- Easy
 
--- context Resident inv tutorAdult:
+context Resident inv tutorAdult:
     -- A resident can not be the tutor of another resident if he or
     -- she is not an adult.
-
+	self.age < 18 implies self.tutored->size() = 0
 
 -------------------------------------------------------------------------------
 --                               tutorInSameGroup
@@ -586,11 +603,12 @@ context Residence inv deriveMaxNbOfFreeUnits:
 -- Tutors and tutored in one group.
 -- Medium
 
--- context Resident inv tutorInSameGroup:
+context Resident inv tutorInSameGroup:
     -- The tutors of a resident are in the same group that this
     -- resident. In other words they are all in the same group of
     -- rooms.
-
+	-- ?? Define a group.
+	self.tutored->forAll(r: Resident | r.IsOccupiedBy.residence = self.IsOccupiedBy.residence)
 
 -------------------------------------------------------------------------------
 --                     uniqueNumberApartForPrivateBathroom
