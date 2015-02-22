@@ -333,7 +333,7 @@ context Tenant inv derivePaidRate:
     -- all bedrooms rented. If the members of his or her group is
     -- spread over more than one floor, then 20€ of reduction will
     -- automatically be deduced.
-	let groupFloors : Set(Integer) = self.rentedBedroom->collect(floor)->asSet() in
+	let groupFloors : Set(Integer) = self.rentedBedroom->collect(occupants)->collect(IsOccupiedBy.floor)->asSet() in
 		if groupFloors->size() > 1 then
 			self.paidRate = self.rentedBedroom->collect(rate)->sum() - 20
 		else
@@ -426,11 +426,7 @@ context Resident inv marriageAntiReflexivity:
 context Resident inv marriageInSameGroup:
     -- A resident and his or her consort occupies a room of the same
     -- group.
-	-- ?? Define a group.
-	self.consort->notEmpty() implies
-		self.consort.IsOccupiedBy.floor = self.consort.consort.IsOccupiedBy.floor and
-		self.consort.IsOccupiedBy.number = self.consort.consort.IsOccupiedBy.number and
-		self.consort.IsOccupiedBy.residence = self.consort.consort.IsOccupiedBy.residence
+	self.consort->notEmpty() implies self.consort.IsOccupiedBy = self.consort.consort.IsOccupiedBy
 
 -------------------------------------------------------------------------------
 --                               marriageSymmetry
