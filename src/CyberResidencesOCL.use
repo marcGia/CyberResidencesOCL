@@ -280,7 +280,7 @@ context Room inv deriveFloor:
     -- The floor number correspond to the first digits of the room
     -- number, where the last two digits are removed. For instance the
     -- room 634 is at the floor 6.
-	self.floor = number/100 -- il sort un reel au lieu d'un entier
+	self.floor = self.number div 100
 	
 
 
@@ -626,5 +626,6 @@ context Resident inv tutorInSameGroup:
 
 context Residence inv uniqueNumberApartForPrivateBathroom:
     -- All rooms have a distinct number, except private bathrooms.
-	self.rooms->isUnique(number)
+	-- (self.rooms - self.bathrooms()->select(b: Bathroom | b.isOnTheLanding = false))->isUnique(number)
+	self.bedrooms()->union(self.bathrooms()->select(b: Bathroom | b.isOnTheLanding = true))->isUnique(number)
 	
